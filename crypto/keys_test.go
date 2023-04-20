@@ -7,7 +7,7 @@ import (
 )
 
 func TestKeyPairSignVerifyValid(t *testing.T) {
-	privKey, _ := GeneratePrivateKey()
+	privKey := GeneratePrivateKey()
 	pubKey := privKey.PublicKey()
 
 	msg := []byte("Hello World")
@@ -18,14 +18,14 @@ func TestKeyPairSignVerifyValid(t *testing.T) {
 }
 
 func TestKeyPairSignVerifyFail(t *testing.T) {
-	privKey, _ := GeneratePrivateKey()
+	privKey := GeneratePrivateKey()
 	pubKey := privKey.PublicKey()
 
 	msg := []byte("Hello World")
 	sig, err := privKey.Sign(msg)
 	assert.Nil(t, err)
 
-	otherPrivKey, _ := GeneratePrivateKey()
+	otherPrivKey := GeneratePrivateKey()
 	otherPubKey := otherPrivKey.PublicKey()
 
 	assert.False(t, sig.Verify(otherPubKey, msg))

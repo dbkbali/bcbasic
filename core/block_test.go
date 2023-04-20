@@ -1,74 +1,50 @@
 package core
 
 import (
-	"bytes"
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/dbkbali/bcbasic/crypto"
 	"github.com/dbkbali/bcbasic/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHeader_Encode_Decode(t *testing.T) {
-	h := Header{
-		Version:   1,
-		PrevBlock: types.RandomHash(),
-		Timestamp: time.Now().UnixNano(),
-		Height:    10,
-		Nonce:     9980908909,
+func RandomBlock(height uint32) *Block {
+	header := &Header{
+		Version:       1,
+		PrevBlockHash: types.RandomHash(),
+		Timestamp:     time.Now().UnixNano(),
+		Height:        height,
+	}
+	tx := Transaction{
+		Data: []byte("foobar"),
 	}
 
-	buf := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buf))
-
-	hDecode := Header{}
-	assert.Nil(t, hDecode.DecodeBinary(buf))
-	assert.Equal(t, h, hDecode)
-	fmt.Printf("%+v", hDecode)
+	return NewBlock(header, []Transaction{tx})
 }
 
-func TestBlock_Encode_Decode(t *testing.T) {
-	b := Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: time.Now().UnixNano(),
-			Height:    10,
-			Nonce:     9980908909,
-		},
-		Transactions: []Transaction{
-			{},
-			{},
-			{},
-		},
-	}
+func TestSignBLock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
 
-	buf := &bytes.Buffer{}
-	assert.Nil(t, b.EncodeBinary(buf))
+	b := RandomBlock(0)
 
-	bDecode := Block{}
-	assert.Nil(t, bDecode.DecodeBinary(buf))
-	assert.Equal(t, b, bDecode)
-	fmt.Printf("%+v", bDecode)
+	assert.Nil(t, b.Sign(privKey))
+	assert.NotNil(t, b.Signature)
+
 }
 
-func TestBlock_Hash(t *testing.T) {
-	b := Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: time.Now().UnixNano(),
-			Height:    10,
-			Nonce:     9980908909,
-		},
-		Transactions: []Transaction{
-			{},
-			{},
-			{},
-		},
-	}
+func TestVerifyBLock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
 
-	h := b.Hash()
-	assert.False(t, h.IsZero())
+	b := RandomBlock(0)
+
+	assert.Nil(t, b.Sign(privKey))
+	assert.Nil(t, b.Verify())
+
+	otherPrivKey := crypto.GeneratePrivateKey()
+	b.Validator = otherPrivKey.PublicKey()
+	assert.NotNil(t, b.Verify())
+
+	b.Height = 100
+	assert.NotNil(t, b.Verify())
 }

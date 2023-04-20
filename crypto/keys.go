@@ -22,14 +22,14 @@ func (k PrivateKey) Sign(data []byte) (*Signature, error) {
 	return &Signature{r: r, s: s}, nil
 }
 
-func GeneratePrivateKey() (*PrivateKey, error) {
+func GeneratePrivateKey() PrivateKey {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 
 		panic(err)
 	}
 
-	return &PrivateKey{key: key}, nil
+	return PrivateKey{key: key}
 }
 
 func (k PrivateKey) PublicKey() PublicKey {
