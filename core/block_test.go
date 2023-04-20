@@ -71,5 +71,4 @@ func TestBlock_Hash(t *testing.T) {
 
 	h := b.Hash()
 	assert.False(t, h.IsZero())
-	fmt.Printf("%+v", h)
 }
