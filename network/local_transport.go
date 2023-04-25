@@ -52,6 +52,24 @@ func (t *LocalTransport) SendMessage(addr NetAddress, payload []byte) error {
 	return nil
 }
 
+func (t *LocalTransport) Broadcast(payload []byte) error {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	for _, peer := range t.peers {
+		if err := t.SendMessage(peer.Addr(), payload); err != nil {
+			return err
+		}
+	}
+	// 	peer.consumerCh <- RPC{
+	// 		From:    t.addr,
+	// 		Payload: bytes.NewReader(payload),
+	// 	}
+	// }
+
+	return nil
+}
+
 func (t *LocalTransport) Addr() NetAddress {
 	return t.addr
 }
