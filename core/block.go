@@ -79,11 +79,11 @@ func (b *Block) Verify() error {
 }
 
 func (b *Block) Decode(r io.Reader, dec Decoder[*Block]) error {
-	return dec.Decode(r, b)
+	return dec.Decode(b)
 }
 
 func (b *Block) Encode(w io.Writer, enc Encoder[*Block]) error {
-	return enc.Encode(w, b)
+	return enc.Encode(b)
 }
 
 func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {

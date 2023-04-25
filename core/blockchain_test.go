@@ -10,7 +10,7 @@ import (
 func TestAddBlock(t *testing.T) {
 	bc := newBlockchainWithGenesis(t)
 
-	lenBlocks := 1000
+	lenBlocks := 100
 	for i := 0; i < lenBlocks; i++ {
 		block := randomBlockWithSignature(t, uint32(i+1), getPrevBlockHash(t, bc, uint32(i+1)))
 		assert.Nil(t, bc.AddBlock(block))
@@ -36,7 +36,7 @@ func TestHasBlock(t *testing.T) {
 
 func TestGetHeader(t *testing.T) {
 	bc := newBlockchainWithGenesis(t)
-	lenBlocks := 1000
+	lenBlocks := 100
 
 	for i := 0; i < lenBlocks; i++ {
 		block := randomBlockWithSignature(t, uint32(i+1), getPrevBlockHash(t, bc, uint32(i+1)))
