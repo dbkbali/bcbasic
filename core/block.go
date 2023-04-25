@@ -2,9 +2,11 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/dbkbali/bcbasic/crypto"
 	"github.com/dbkbali/bcbasic/types"
@@ -37,11 +39,28 @@ type Block struct {
 	hash types.Hash
 }
 
-func NewBlock(h *Header, txs []Transaction) *Block {
+func NewBlock(h *Header, txs []Transaction) (*Block, error) {
 	return &Block{
 		Header:       h,
 		Transactions: txs,
+	}, nil
+}
+
+func NewBlockFromPrevHeader(prevHeader *Header, txx []Transaction) (*Block, error) {
+	dataHash, err := CalculateDataHash(txx)
+	if err != nil {
+		return nil, err
 	}
+
+	header := &Header{
+		Version:       1,
+		Height:        prevHeader.Height + 1,
+		DataHash:      dataHash,
+		PrevBlockHash: BlockHasher{}.Hash(prevHeader),
+		Timestamp:     time.Now().UnixNano(),
+	}
+
+	return NewBlock(header, txx)
 }
 
 func (b *Block) AddTransaction(tx *Transaction) {
@@ -75,6 +94,11 @@ func (b *Block) Verify() error {
 		}
 	}
 
+	hash, _ := CalculateDataHash(b.Transactions)
+	if hash != b.DataHash {
+		return fmt.Errorf("block [%s] data hash mismatch", b.Hash(BlockHasher{}))
+	}
+
 	return nil
 }
 
@@ -92,4 +116,18 @@ func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
 	}
 
 	return b.hash
+}
+
+func CalculateDataHash(txs []Transaction) (hash types.Hash, err error) {
+	buf := &bytes.Buffer{}
+
+	for _, tx := range txs {
+		if err = tx.Encode(NewGobTxEncoder(buf)); err != nil {
+			return
+		}
+	}
+
+	hash = sha256.Sum256((buf.Bytes()))
+
+	return
 }

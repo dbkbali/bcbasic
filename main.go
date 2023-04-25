@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"log"
 	"math/rand"
 
 	"strconv"
@@ -31,11 +32,18 @@ func main() {
 		}
 	}()
 
+	privKey := crypto.GeneratePrivateKey()
 	opts := network.ServerOptions{
+		PrivateKey: &privKey,
+		ID:         "LocalServer",
 		Transports: []network.Transport{trLocal},
 	}
 
-	srv := network.NewServer(opts)
+	srv, err := network.NewServer(opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	srv.Start()
 }
 
