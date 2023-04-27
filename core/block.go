@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/dbkbali/bcbasic/crypto"
@@ -31,7 +30,7 @@ func (h *Header) Bytes() []byte {
 
 type Block struct {
 	*Header
-	Transactions []Transaction
+	Transactions []*Transaction
 	Validator    crypto.PublicKey
 	Signature    *crypto.Signature
 
@@ -39,14 +38,14 @@ type Block struct {
 	hash types.Hash
 }
 
-func NewBlock(h *Header, txs []Transaction) (*Block, error) {
+func NewBlock(h *Header, txs []*Transaction) (*Block, error) {
 	return &Block{
 		Header:       h,
 		Transactions: txs,
 	}, nil
 }
 
-func NewBlockFromPrevHeader(prevHeader *Header, txx []Transaction) (*Block, error) {
+func NewBlockFromPrevHeader(prevHeader *Header, txx []*Transaction) (*Block, error) {
 	dataHash, err := CalculateDataHash(txx)
 	if err != nil {
 		return nil, err
@@ -64,7 +63,7 @@ func NewBlockFromPrevHeader(prevHeader *Header, txx []Transaction) (*Block, erro
 }
 
 func (b *Block) AddTransaction(tx *Transaction) {
-	b.Transactions = append(b.Transactions, *tx)
+	b.Transactions = append(b.Transactions, tx)
 }
 
 func (b *Block) Sign(pk crypto.PrivateKey) error {
@@ -102,11 +101,11 @@ func (b *Block) Verify() error {
 	return nil
 }
 
-func (b *Block) Decode(r io.Reader, dec Decoder[*Block]) error {
+func (b *Block) Decode(dec Decoder[*Block]) error {
 	return dec.Decode(b)
 }
 
-func (b *Block) Encode(w io.Writer, enc Encoder[*Block]) error {
+func (b *Block) Encode(enc Encoder[*Block]) error {
 	return enc.Encode(b)
 }
 
@@ -118,7 +117,7 @@ func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
 	return b.hash
 }
 
-func CalculateDataHash(txs []Transaction) (hash types.Hash, err error) {
+func CalculateDataHash(txs []*Transaction) (hash types.Hash, err error) {
 	buf := &bytes.Buffer{}
 
 	for _, tx := range txs {

@@ -33,7 +33,7 @@ type Server struct {
 }
 
 func NewServer(options ServerOptions) (*Server, error) {
-	if options.BlockTime == 0 {
+	if options.BlockTime == time.Duration(0) {
 		options.BlockTime = defaultBlockTime
 	}
 	if options.RPCDecodeFunc == nil {
@@ -44,7 +44,7 @@ func NewServer(options ServerOptions) (*Server, error) {
 		options.Logger = log.With(options.Logger, "ID", options.ID)
 	}
 
-	chain, err := core.NewBlockchain(genesisBlock())
+	chain, err := core.NewBlockchain(options.Logger, genesisBlock())
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func NewServer(options ServerOptions) (*Server, error) {
 	s := &Server{
 		ServerOptions: options,
 		chain:         chain,
-		memPool:       NewTxPool(),
+		memPool:       NewTxPool(1000),
 		isValidator:   options.PrivateKey != nil,
 		rpcCh:         make(chan RPC),
 		quitCh:        make(chan struct{}, 1),
@@ -80,11 +80,11 @@ free:
 		case rpc := <-s.rpcCh:
 			msg, err := s.RPCDecodeFunc(rpc)
 			if err != nil {
-				s.Logger.Log("msg", "failed to decode rpc", "err", err)
+				s.Logger.Log("err", err)
 			}
 
 			if err := s.RPCProcessor.ProcessMessage(msg); err != nil {
-				s.Logger.Log("msg", "failed to process rpc", "err", err)
+				s.Logger.Log("err", err)
 			}
 		case <-s.quitCh:
 			break free
@@ -94,10 +94,21 @@ free:
 	s.Logger.Log("msg", "server stopped")
 }
 
+// func (s *Server) bootstrapNodes() {
+// 	for _, tr := range s.Transports {
+// 		if s.ServerOptions.Transport.Addr() != tr.Addr() {
+// 			if err := s.Transport.Connect(tr); err != nil {
+// 				s.Logger.Log("error", "could not connect to remote", "err", err)
+// 			}
+// 			s.Logger.Log("msg", "connected to remote", "we", s.Transport.Addr(), "addr", tr.Addr())
+// 		}
+// 	}
+// }
+
 func (s *Server) validatorLoop() {
 	ticker := time.NewTicker(s.BlockTime)
 
-	s.Logger.Log("msg", "validator loop started")
+	s.Logger.Log("msg", "Starting validator loop", "blockTime", s.BlockTime)
 
 	for {
 		<-ticker.C
@@ -109,6 +120,8 @@ func (s *Server) ProcessMessage(msg *DecodeMessage) error {
 	switch t := msg.Data.(type) {
 	case *core.Transaction:
 		return s.processTransaction(t)
+	case *core.Block:
+		return s.processBlock(t)
 	}
 
 	return nil
@@ -123,10 +136,20 @@ func (s *Server) broadcast(payload []byte) error {
 	return nil
 }
 
+func (s *Server) processBlock(b *core.Block) error {
+	if err := s.chain.AddBlock(b); err != nil {
+		return err
+	}
+
+	go s.broadcastBlock(b)
+
+	return nil
+}
+
 func (s *Server) processTransaction(tx *core.Transaction) error {
 	hash := tx.Hash(core.TxHasher{})
 
-	if s.memPool.Has(hash) {
+	if s.memPool.Contains(hash) {
 		return nil
 	}
 
@@ -134,17 +157,27 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 		return err
 	}
 
-	tx.SetFirstSeen(time.Now().UnixNano())
-
-	s.Logger.Log(
-		"msg", "added new tx to pool",
-		"hash", hash,
-		"mempool len", s.memPool.Len(),
-	)
+	// s.Logger.Log(
+	// 	"msg", "added new tx to pool",
+	// 	"hash", hash,
+	// 	"mempool len", s.memPool.PendingCount(),
+	// )
 
 	go s.broadcastTx(tx)
 
-	return s.memPool.Add(tx)
+	s.memPool.Add(tx)
+	return nil
+}
+
+func (s *Server) broadcastBlock(b *core.Block) error {
+	buf := &bytes.Buffer{}
+	if err := b.Encode(core.NewGobBlockEncoder(buf)); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeBlock, buf.Bytes())
+
+	return s.broadcast(msg.Bytes())
 }
 
 func (s *Server) broadcastTx(tx *core.Transaction) error {
@@ -176,7 +209,11 @@ func (s *Server) CreateNewBlock() error {
 		return err
 	}
 
-	block, err := core.NewBlockFromPrevHeader(currentHeader, nil)
+	// TODO: change from adding all txs to pool - limit via some function later
+	// To match the tx types
+	txx := s.memPool.Pending()
+
+	block, err := core.NewBlockFromPrevHeader(currentHeader, txx)
 	if err != nil {
 		return err
 	}
@@ -189,6 +226,10 @@ func (s *Server) CreateNewBlock() error {
 		return err
 	}
 
+	s.memPool.ClearPending()
+
+	go s.broadcastBlock(block)
+
 	return nil
 }
 
@@ -197,10 +238,9 @@ func genesisBlock() *core.Block {
 		Version:   1,
 		DataHash:  types.Hash{},
 		Height:    0,
-		Timestamp: time.Now().UnixNano(),
+		Timestamp: 000000,
 	}
 
 	b, _ := core.NewBlock(header, nil)
-
 	return b
 }
