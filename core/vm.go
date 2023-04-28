@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"encoding/binary"
+	"fmt"
+)
 
 type Instruction byte
 
@@ -10,6 +13,7 @@ const (
 	InstrPushByte Instruction = 0x0c
 	InstrPack     Instruction = 0x0d
 	InstrSub      Instruction = 0x0e
+	InstrStore    Instruction = 0x0f
 )
 
 type Stack struct {
@@ -38,24 +42,24 @@ func (s *Stack) Pop() any {
 }
 
 type VM struct {
-	data    []byte
-	instPtr int
-	stack   *Stack
+	data          []byte
+	instPtr       int
+	stack         *Stack
+	contractState *State
 }
 
-func NewVM(data []byte) *VM {
+func NewVM(data []byte, contractState *State) *VM {
 	return &VM{
-		data:    data,
-		instPtr: 0,
-		stack:   NewStack(128),
+		contractState: contractState,
+		data:          data,
+		instPtr:       0,
+		stack:         NewStack(128),
 	}
 }
 
 func (vm *VM) Run() error {
 	for {
 		instr := Instruction(vm.data[vm.instPtr])
-
-		fmt.Println(instr)
 
 		if err := vm.Exec(instr); err != nil {
 			return err
@@ -72,6 +76,24 @@ func (vm *VM) Run() error {
 
 func (vm *VM) Exec(instr Instruction) error {
 	switch instr {
+	case InstrStore:
+		// var serializedValue []byte
+		var (
+			key             = vm.stack.Pop().([]byte)
+			value           = vm.stack.Pop()
+			serializedValue []byte
+		)
+
+		switch v := value.(type) {
+		case int:
+
+			serializedValue = serializeInt64(int64(v))
+			fmt.Println("serializedValue: ", serializedValue)
+		default:
+			panic("not implemented")
+		}
+
+		vm.contractState.Put(key, serializedValue)
 	case InstrPushInt:
 		vm.stack.Push(int(vm.data[vm.instPtr-1]))
 
@@ -80,7 +102,9 @@ func (vm *VM) Exec(instr Instruction) error {
 
 	case InstrPack:
 		n := vm.stack.Pop().(int)
+
 		b := make([]byte, n)
+
 		for i := 0; i < n; i++ {
 			b[i] = vm.stack.Pop().(byte)
 		}
@@ -100,4 +124,14 @@ func (vm *VM) Exec(instr Instruction) error {
 		vm.stack.Push(c)
 	}
 	return nil
+}
+
+func serializeInt64(value int64) []byte {
+	buf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buf, uint64(value))
+	return buf
+}
+
+func deserializeInt64(buf []byte) int64 {
+	return int64(binary.LittleEndian.Uint64(buf))
 }

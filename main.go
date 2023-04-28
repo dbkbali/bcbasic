@@ -78,8 +78,8 @@ func makeServer(id string, tr network.Transport, pk *crypto.PrivateKey) *network
 }
 
 func sendTransaction(tr network.Transport, to network.NetAddress) error {
+	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0xf}
 	privKey := crypto.GeneratePrivateKey()
-	data := []byte{0x01, 0x0a, 0x02, 0x0a, 0x0b}
 	tx := core.NewTransaction(data)
 	tx.Sign(privKey)
 	buf := &bytes.Buffer{}
