@@ -49,8 +49,10 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 		}
 
 		fmt.Printf("state: %+v\n", vm.contractState)
-		// result := vm.stack.Pop()
 
+		result := vm.stack.Pop()
+
+		fmt.Printf("result: %+v\n", result)
 		// bc.logger.Log("vm result", result)
 
 	}
