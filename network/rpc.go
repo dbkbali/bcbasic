@@ -2,9 +2,11 @@ package network
 
 import (
 	"bytes"
+	"crypto/elliptic"
 	"encoding/gob"
 	"fmt"
 	"io"
+	"net"
 
 	"github.com/dbkbali/bcbasic/core"
 	"github.com/sirupsen/logrus"
@@ -16,10 +18,13 @@ const (
 	MessageTypeTx        MessageType = 0x1
 	MessageTypeBlock     MessageType = 0x2
 	MessageTypeGetBlocks MessageType = 0x3
+	MessageTypeStatus    MessageType = 0x4
+	MessageTypeGetStatus MessageType = 0x5
+	MessageTypeBlocks    MessageType = 0x6
 )
 
 type RPC struct {
-	From    NetAddress
+	From    net.Addr
 	Payload io.Reader
 }
 
@@ -42,7 +47,7 @@ func (msg *Message) Bytes() []byte {
 }
 
 type DecodeMessage struct {
-	From NetAddress
+	From net.Addr
 	Data any
 }
 
@@ -50,6 +55,7 @@ type RPCDecodeFunc func(RPC) (*DecodeMessage, error)
 
 func DefaultRPCDecodeFunc(rpc RPC) (*DecodeMessage, error) {
 	msg := Message{}
+
 	if err := gob.NewDecoder(rpc.Payload).Decode(&msg); err != nil {
 		return nil, fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
 	}
@@ -82,6 +88,45 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodeMessage, error) {
 			Data: block,
 		}, nil
 
+	case MessageTypeGetStatus:
+		return &DecodeMessage{
+			From: rpc.From,
+			Data: &GetStatusMessage{},
+		}, nil
+
+	case MessageTypeStatus:
+		statusMessage := new(StatusMessage)
+		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(statusMessage); err != nil {
+			return nil, err
+		}
+
+		return &DecodeMessage{
+			From: rpc.From,
+			Data: statusMessage,
+		}, nil
+
+	case MessageTypeGetBlocks:
+		getBlocks := new(GetBlocksMessage)
+		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(getBlocks); err != nil {
+			return nil, err
+		}
+
+		return &DecodeMessage{
+			From: rpc.From,
+			Data: getBlocks,
+		}, nil
+
+	case MessageTypeBlocks:
+		blocks := new(BlocksMessage)
+		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(blocks); err != nil {
+			return nil, err
+		}
+
+		return &DecodeMessage{
+			From: rpc.From,
+			Data: blocks,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown message header type: %x", msg.Header)
 	}
@@ -89,4 +134,8 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodeMessage, error) {
 
 type RPCProcessor interface {
 	ProcessMessage(*DecodeMessage) error
+}
+
+func init() {
+	gob.Register(elliptic.P256())
 }

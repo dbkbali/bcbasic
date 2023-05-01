@@ -12,6 +12,7 @@ type Blockchain struct {
 	store     Storage
 	lock      sync.RWMutex
 	headers   []*Header
+	blocks    []*Block
 	validator Validator
 	// TODO: convert to interface
 	contractState *State
@@ -48,16 +49,21 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 			return err
 		}
 
-		fmt.Printf("state: %+v\n", vm.contractState)
-
-		result := vm.stack.Pop()
-
-		fmt.Printf("result: %+v\n", result)
-		// bc.logger.Log("vm result", result)
+		// vmResult := vm.stack.Pop()
 
 	}
 
 	return bc.addBlockWithoutValidation(b)
+}
+
+func (bc *Blockchain) GetBlock(height uint32) (*Block, error) {
+	if height > bc.Height() {
+		return nil, fmt.Errorf("blockchain height [%d] is less than requested height [%d]", bc.Height(), height)
+	}
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
+	return bc.blocks[height], nil
 }
 
 func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
@@ -82,15 +88,15 @@ func (bc *Blockchain) Height() uint32 {
 
 func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
 	bc.lock.Lock()
+	bc.headers = append(bc.headers, b.Header)
+	bc.blocks = append(bc.blocks, b)
+	bc.lock.Unlock()
 
 	bc.logger.Log(
-		"msg", "new block",
-		"height", b.Height,
+		"msg", "BlockAdd",
 		"hash", b.Hash(BlockHasher{}),
-		"transactions", len(b.Transactions),
+		"height", b.Height,
+		"txs", len(b.Transactions),
 	)
-	bc.headers = append(bc.headers, b.Header)
-	bc.lock.Unlock()
 	return bc.store.Put(b)
-
 }

@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/binary"
-	"fmt"
 )
 
 type Instruction byte
@@ -102,7 +101,7 @@ func (vm *VM) Exec(instr Instruction) error {
 		case int:
 
 			serializedValue = serializeInt64(int64(v))
-			fmt.Println("serializedValue: ", serializedValue)
+			// fmt.Println("serializedValue: ", serializedValue)
 		default:
 			panic("not implemented")
 		}
